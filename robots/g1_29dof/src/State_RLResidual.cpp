@@ -14,7 +14,7 @@ State_RLResidual::State_RLResidual(int state_mode, std::string state_string)
         YAML::LoadFile(policy_dir / "params" / "deploy_scale_half.yaml"),
         std::make_shared<unitree::BaseArticulation<LowState_t::SharedPtr>>(FSMState::lowstate)
     );
-    auto policy_path = policy_dir / "exported" / "policy_ar_new_cmg_base.onnx";
+    auto policy_path = policy_dir / "exported" / "policy_new_cmg_post2.onnx";
     auto cmg_path = cmg_dir / "exported" / "cmg_exported_new.onnx";
     printf("[RLResidual] policy: %s\n", policy_path.filename().c_str());
     printf("[RLResidual] cmg:    %s\n", cmg_path.filename().c_str());
@@ -37,7 +37,7 @@ void State_RLResidual::run()
     }
 }
 
-// 2026-03-23_00-26-09 -> policy_new_cmg_base -> new CMG, scale 0.5
+// 2026-03-23_00-26-09 -> policy_new_cmg_base -> new CMG, scale 0.5 --> policy_ar_new_cmg_base --> better turning
 // policy_non_ar_new -> old CMG, scale 0.25
-// forward_ar() <-> forward() @State_RLResidual.h ar/non-ar
-// min-max      <-> z-score   @State_RLResidual.h old/new CMG
+//forward_ar() <-> forward() @State_RLResidual.h ar/non-ar
+// min-max      <-> z-score  @algorithm.h old/new CMG
