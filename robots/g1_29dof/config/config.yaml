@@ -6,7 +6,7 @@ FSM:
       id: 2
     Velocity:
       id: 3
-      type: RLBase
+      type: RLResidual
 
     Mimic_Dance_102: # uncomment to enable
       id: 101
