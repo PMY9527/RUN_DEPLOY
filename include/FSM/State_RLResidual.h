@@ -48,22 +48,15 @@ public:
 
             while (policy_thread_running)
             {
-                // Decompose env->step() to insert CMG between obs and policy
-                // Matches Python training pipeline: CMG → inject obs → policy → gated offset → process
-
-                // 1. Update robot state
                 env->episode_length += 1;
                 env->robot->update();
 
-                // 2. Get velocity command for CMG
                 auto& jp = env->robot->data.joint_pos;
                 auto& jv = env->robot->data.joint_vel;
                 auto cmd = isaaclab::observations_map()["keyboard_velocity_commands"](env.get(), {}); // velocity_commands if using joystick
 
-                // Dead-zone: zero out small forward commands
                 if (cmd[0] < 0.5f) cmd[0] = 0.0f;
 
-                // 3. CMG autoregressive forward
                 cmg->forward_ar(
                     {jp.data(), jp.data() + jp.size()},
                     {jv.data(), jv.data() + jv.size()},
@@ -72,31 +65,23 @@ public:
                 auto motion_ref = cmg->get_motion_ref();  // 58 dims (pos + vel, USD order)
                 auto qr = cmg->get_qref();                // 29 dims (positions only)
 
-                // 4. Compute observations
                 auto obs = env->observation_manager->compute();
 
-                // 5. Inject CMG output into obs for policy network
                 obs["motion"] = motion_ref;
                 obs["cmg_input"] = cmd;
 
-                // 6. Run policy to get residual
                 auto residual = env->alg->act(obs);
 
-                // 7. Compute gated offset: blend qref with default_joint_pos by cmd magnitude
-                //    At cmd≈0 → standing (default_joint_pos), at walking speed → qref
                 float cmd_mag = std::sqrt(cmd[0]*cmd[0] + cmd[1]*cmd[1] + cmd[2]*cmd[2]);
                 float gate = std::min(cmd_mag / 0.1f, 1.0f);
 
-                // 8. Set action term offset to gated CMG qref (matches training pipeline)
                 auto& joint_action = static_cast<isaaclab::JointAction&>(*env->action_manager->_terms[0]);
                 joint_action._offset.resize(29);
                 for (size_t i = 0; i < 29; ++i)
                     joint_action._offset[i] = gate * qr[i] + (1.0f - gate) * default_joint_pos_[i];
 
-                // 9. Process residual through action manager (applies: residual * scale + gated_offset)
                 env->action_manager->process_action(residual);
 
-                // Publish CMG data to shared memory for visualization
                 if (cmg_viz.ok()) {
                     auto qref_vel = std::vector<float>(motion_ref.begin() + 29, motion_ref.end());
                     cmg_viz.write(
@@ -110,7 +95,6 @@ public:
                     );
                 }
 
-                // Sleep
                 std::this_thread::sleep_until(sleepTill);
                 sleepTill += dt;
             }
