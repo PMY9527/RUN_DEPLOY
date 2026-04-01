@@ -106,6 +106,7 @@ public:
 
     YAML::Node cfg;
     ManagerBasedRLEnv* env;
+    std::vector<std::unique_ptr<ActionTerm>> _terms;
 
 private:
     void _prepare_terms()
@@ -124,7 +125,6 @@ private:
     }
 
     std::vector<float> _action;
-    std::vector<std::unique_ptr<ActionTerm>> _terms;
 };
 
 };

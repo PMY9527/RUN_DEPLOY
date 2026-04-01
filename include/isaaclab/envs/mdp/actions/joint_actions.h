@@ -80,6 +80,8 @@ public:
         _raw_actions.assign(_action_dim, 0.0f);
     }
 
+public:
+    std::vector<float> _offset;
 protected:
     int _action_dim;
     std::vector<int> _joint_ids;
@@ -88,7 +90,6 @@ protected:
     std::vector<float> _processed_actions;
 
     std::vector<float> _scale;
-    std::vector<float> _offset;
     std::vector<std::vector<float> > _clip;
 };
 

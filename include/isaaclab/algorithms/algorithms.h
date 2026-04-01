@@ -328,7 +328,7 @@ public:
         // } // MIN MAX NORM FOR OLD CMG
 
         for (size_t i = 0; i < cmd_dim; ++i) {
-            cmd_norm[i] = command[i] - cmd_mean[i] / cmd_std[i]; // ZSCORE NORM FOR NEW CMG
+            cmd_norm[i] = (command[i] - cmd_mean[i]) / cmd_std[i]; // ZSCORE NORM FOR NEW CMG
         }
 
         auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
@@ -349,6 +349,7 @@ public:
         std::vector<float> motion_ref_cmg(motion_dim);
         for (size_t i = 0; i < motion_dim; ++i) {
             motion_ref_cmg[i] = output_data[i] * motion_std[i] + motion_mean[i];
+            motion_ref_cmg[i] = std::clamp(motion_ref_cmg[i], -3.14f, 3.14f);
         }
 
         // Leaky AR: blend CMG output with actual state to prevent

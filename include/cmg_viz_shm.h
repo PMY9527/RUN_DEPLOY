@@ -26,6 +26,7 @@ struct CMGVizData {
     float command[CMG_VIZ_CMD_DIM];     // velocity commands [vx, vy, yaw_rate]
     float raw_residual[CMG_VIZ_NUM_JOINTS]; // policy residual output (USD order)
     float combined[CMG_VIZ_NUM_JOINTS]; // final action: qref + residual (USD order)
+    float ctrl[CMG_VIZ_NUM_JOINTS];     // PD ctrl torques: kp*(action-pos) - kd*vel (USD order)
 };
 
 class CMGVizWriter {
@@ -65,7 +66,8 @@ public:
                const std::vector<float>& actual_vel,
                const std::vector<float>& command,
                const std::vector<float>& raw_residual,
-               const std::vector<float>& combined) {
+               const std::vector<float>& combined,
+               const std::vector<float>& ctrl = {}) {
         if (!data_) return;
 
         auto now = std::chrono::high_resolution_clock::now();
@@ -84,6 +86,7 @@ public:
         copy(data_->command, command, CMG_VIZ_CMD_DIM);
         copy(data_->raw_residual, raw_residual, CMG_VIZ_NUM_JOINTS);
         copy(data_->combined, combined, CMG_VIZ_NUM_JOINTS);
+        copy(data_->ctrl, ctrl, CMG_VIZ_NUM_JOINTS);
 
         data_->seq.fetch_add(1, std::memory_order_release);
     }

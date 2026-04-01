@@ -28,6 +28,13 @@ public:
         }
 
         env->robot->update();
+
+        // Cache default joint positions for gated offset (standing pose)
+        auto& djp = env->robot->data.default_joint_pos;
+        default_joint_pos_.resize(djp.size());
+        for (int i = 0; i < djp.size(); ++i)
+            default_joint_pos_[i] = djp[i];
+
         // Start policy thread
         policy_thread_running = true;
         policy_thread = std::thread([this]{
@@ -41,70 +48,65 @@ public:
 
             while (policy_thread_running)
             {
-                // Policy step: robot update, obs compute (last_action from prev combined), policy act
-                auto t0 = clock::now();
-                env->step();
-                auto t1 = clock::now();
+                // Decompose env->step() to insert CMG between obs and policy
+                // Matches Python training pipeline: CMG → inject obs → policy → gated offset → process
 
-                // CMG: AR/Non-AR forward
+                // 1. Update robot state
+                env->episode_length += 1;
+                env->robot->update();
+
+                // 2. Get velocity command for CMG
                 auto& jp = env->robot->data.joint_pos;
                 auto& jv = env->robot->data.joint_vel;
                 auto cmd = isaaclab::observations_map()["keyboard_velocity_commands"](env.get(), {}); // velocity_commands if using joystick
-                cmg->forward_ar( // forward_ar if using autoregressive cmg
+
+                // Dead-zone: zero out small forward commands
+                if (cmd[0] < 0.5f) cmd[0] = 0.0f;
+
+                // 3. CMG autoregressive forward
+                cmg->forward_ar(
                     {jp.data(), jp.data() + jp.size()},
                     {jv.data(), jv.data() + jv.size()},
                     {cmd.data(), cmd.data() + cmd.size()}
                 );
-                auto t2 = clock::now();
-                auto qr = cmg->get_qref();
+                auto motion_ref = cmg->get_motion_ref();  // 58 dims (pos + vel, USD order)
+                auto qr = cmg->get_qref();                // 29 dims (positions only)
 
-                // qref + raw_residual
-                auto raw_residual = env->action_manager->action();
-                std::vector<float> combined(raw_residual.size());
-                for (size_t i = 0; i < combined.size(); ++i)
-                    combined[i] = qr[i] + raw_residual[i];
-                combined[25] = 0.0f;  // zero wrist pitch
-                combined[26] = 0.0f;
+                // 4. Compute observations
+                auto obs = env->observation_manager->compute();
 
-                env->action_manager->process_action(combined);
+                // 5. Inject CMG output into obs for policy network
+                obs["motion"] = motion_ref;
+                obs["cmg_input"] = cmd;
 
-                // // Print CMG qref and residual per joint every 0.5s
-                // {
-                //     static auto last_print = clock::now();
-                //     auto now = clock::now();
-                //     if (std::chrono::duration<double>(now - last_print).count() >= 0.5) {
-                //         last_print = now;
-                //         printf("\n--- CMG qref | Residual ---\n");
-                //         for (size_t i = 0; i < qr.size(); ++i) {
-                //             printf("  [%2zu] qref:%+.4f  res:%+.4f\n", i, qr[i], raw_residual[i]);
-                //         }
-                //     }
-                // }
+                // 6. Run policy to get residual
+                auto residual = env->alg->act(obs);
 
-                // Print inference times every 1s
-                // {
-                //     static auto last_print = clock::now();
-                //     auto now = clock::now();
-                //     if (std::chrono::duration<double>(now - last_print).count() >= 1.0) {
-                //         last_print = now;
-                //         double policy_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-                //         double cmg_ms = std::chrono::duration<double, std::milli>(t2 - t1).count();
-                //         printf("[RLResidual] policy: %.2f ms | cmg: %.2f ms\n", policy_ms, cmg_ms);
-                //     }
-                // }
+                // 7. Compute gated offset: blend qref with default_joint_pos by cmd magnitude
+                //    At cmd≈0 → standing (default_joint_pos), at walking speed → qref
+                float cmd_mag = std::sqrt(cmd[0]*cmd[0] + cmd[1]*cmd[1] + cmd[2]*cmd[2]);
+                float gate = std::min(cmd_mag / 0.1f, 1.0f);
+
+                // 8. Set action term offset to gated CMG qref (matches training pipeline)
+                auto& joint_action = static_cast<isaaclab::JointAction&>(*env->action_manager->_terms[0]);
+                joint_action._offset.resize(29);
+                for (size_t i = 0; i < 29; ++i)
+                    joint_action._offset[i] = gate * qr[i] + (1.0f - gate) * default_joint_pos_[i];
+
+                // 9. Process residual through action manager (applies: residual * scale + gated_offset)
+                env->action_manager->process_action(residual);
 
                 // Publish CMG data to shared memory for visualization
                 if (cmg_viz.ok()) {
-                    auto motion_ref = cmg->get_motion_ref();
-                    std::vector<float> qref_vel(motion_ref.begin() + 29, motion_ref.end());
+                    auto qref_vel = std::vector<float>(motion_ref.begin() + 29, motion_ref.end());
                     cmg_viz.write(
                         qr,                                                    // qref positions
                         qref_vel,                                              // qref velocities
                         {jp.data(), jp.data() + jp.size()},                    // actual positions
                         {jv.data(), jv.data() + jv.size()},                    // actual velocities
                         {cmd.data(), cmd.data() + cmd.size()},                 // velocity commands
-                        raw_residual,                                          // policy residual
-                        combined                                               // final combined
+                        residual,                                              // policy residual
+                        env->action_manager->processed_actions()               // final combined
                     );
                 }
 
@@ -132,6 +134,7 @@ private:
 
     std::thread policy_thread;
     bool policy_thread_running = false;
+    std::vector<float> default_joint_pos_;
 };
 
 REGISTER_FSM(State_RLResidual)
