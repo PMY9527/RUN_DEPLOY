@@ -1,11 +1,5 @@
 ONNX_FIX.md
-policy_ar_scale_half.onnx
-policy_ar_scale_one.onnx
-policy_ar.onnx
-policy_non_ar_new_6k.onnx
-policy_non_ar.onnx
-policy_old_cmg_base.onnx
-policy_new_cmg_post.onnx
+.claude/
 h1/
 h1_2/
 go2/

@@ -11,15 +11,15 @@ State_RLResidual::State_RLResidual(int state_mode, std::string state_string)
     auto cmg_dir = param::parser_policy_dir(cfg["cmg_dir"].as<std::string>());
 
     env = std::make_unique<isaaclab::ManagerBasedRLEnv>(
-        YAML::LoadFile(policy_dir / "params" / "deploy_scale_one.yaml"),
+        YAML::LoadFile(policy_dir / "params" / "deploy.yaml"),
         std::make_shared<unitree::BaseArticulation<LowState_t::SharedPtr>>(FSMState::lowstate)
     );
-    auto policy_path = policy_dir / "exported" / "cmg04011216.onnx";
-    auto cmg_path = cmg_dir / "exported" / "cmg_exported_new.onnx";
+    auto policy_path = policy_dir / "exported" / "residual.onnx";
+    auto cmg_path = cmg_dir / "exported" / "cmg_exported.onnx";
     printf("[RLResidual] policy: %s\n", policy_path.filename().c_str());
     printf("[RLResidual] cmg:    %s\n", cmg_path.filename().c_str());
     env->alg = std::make_unique<isaaclab::OrtRunner>(policy_path);
-    cmg = std::make_unique<isaaclab::CMGRunner>(cmg_path, cmg_dir / "stats" / "cmg_stats_new.yaml");
+    cmg = std::make_unique<isaaclab::CMGRunner>(cmg_path, cmg_dir / "stats" / "cmg_stats.yaml");
 
     this->registered_checks.emplace_back(
         std::make_pair(
