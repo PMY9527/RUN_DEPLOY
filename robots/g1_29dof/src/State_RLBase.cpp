@@ -13,7 +13,7 @@ REGISTER_OBSERVATION(keyboard_velocity_commands)
     static auto ranges = env->cfg["commands"]["base_velocity"]["ranges"];
     static std::vector<float> cmd = {0.0f, 0.0f, 0.0f};
     static std::string prev_key = "";
-    constexpr float step = 0.1f;
+    constexpr float step = 0.5f;
 
     std::string key = FSMState::keyboard->key();
 
