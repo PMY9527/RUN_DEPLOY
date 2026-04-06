@@ -29,12 +29,6 @@ public:
 
         env->robot->update();
 
-        // Cache default joint positions for gated offset (standing pose)
-        auto& djp = env->robot->data.default_joint_pos;
-        default_joint_pos_.resize(djp.size());
-        for (int i = 0; i < djp.size(); ++i)
-            default_joint_pos_[i] = djp[i];
-
         // Start policy thread
         policy_thread_running = true;
         policy_thread = std::thread([this]{
@@ -72,13 +66,10 @@ public:
 
                 auto residual = env->alg->act(obs);
 
-                float cmd_mag = std::sqrt(cmd[0]*cmd[0] + cmd[1]*cmd[1] + cmd[2]*cmd[2]);
-                float gate = std::min(cmd_mag / 0.1f, 1.0f);
-
                 auto& joint_action = static_cast<isaaclab::JointAction&>(*env->action_manager->_terms[0]);
                 joint_action._offset.resize(29);
                 for (size_t i = 0; i < 29; ++i)
-                    joint_action._offset[i] = gate * qr[i] + (1.0f - gate) * default_joint_pos_[i];
+                    joint_action._offset[i] = qr[i];
 
                 env->action_manager->process_action(residual);
 
@@ -118,7 +109,6 @@ private:
 
     std::thread policy_thread;
     bool policy_thread_running = false;
-    std::vector<float> default_joint_pos_;
 };
 
 REGISTER_FSM(State_RLResidual)

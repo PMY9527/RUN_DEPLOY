@@ -13,7 +13,7 @@ REGISTER_OBSERVATION(keyboard_velocity_commands)
     static auto ranges = env->cfg["commands"]["base_velocity"]["ranges"];
     static std::vector<float> cmd = {0.0f, 0.0f, 0.0f};
     static std::string prev_key = "";
-    constexpr float step = 0.1f;
+    constexpr float step = 0.5f;
 
     std::string key = FSMState::keyboard->key();
 
@@ -23,8 +23,8 @@ REGISTER_OBSERVATION(keyboard_velocity_commands)
         else if (key == "s") cmd[0] -= step;
         else if (key == "a") cmd[1] += step;
         else if (key == "d") cmd[1] -= step;
-        else if (key == "q") cmd[2] += step;
-        else if (key == "e") cmd[2] -= step;
+        else if (key == "q") cmd[2] += step/5;
+        else if (key == "e") cmd[2] -= step/5;
         else if (key == "x") { cmd[0] = 0; cmd[1] = 0; cmd[2] = 0; }
 
         cmd[0] = std::clamp(cmd[0], ranges["lin_vel_x"][0].as<float>(), ranges["lin_vel_x"][1].as<float>());
