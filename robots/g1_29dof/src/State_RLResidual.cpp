@@ -14,7 +14,7 @@ State_RLResidual::State_RLResidual(int state_mode, std::string state_string)
         YAML::LoadFile(policy_dir / "params" / "deploy.yaml"),
         std::make_shared<unitree::BaseArticulation<LowState_t::SharedPtr>>(FSMState::lowstate)
     );
-    auto policy_path = policy_dir / "exported" / "residual.onnx";
+    auto policy_path = policy_dir / "exported" / "foothold.onnx";
     auto cmg_path = cmg_dir / "exported" / "cmg_exported_new.onnx";
     printf("[RLResidual] policy: %s\n", policy_path.filename().c_str());
     printf("[RLResidual] cmg:    %s\n", cmg_path.filename().c_str());
